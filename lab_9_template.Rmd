@@ -75,7 +75,7 @@ by_city <- ggplot(homes_sub, aes(x = Price)) +
   scale_y_continuous(expand = c(0,0)) +
   labs(x = "Home Prices (USD)", y = "Density")
 
-by_city
+by_city #this is the density distribution of housing prices. bins are centered around observations. Santa-maria housing prices may be lower than other groups. means seem to match our thoughts from our density distribution
 
 ```
 
@@ -86,9 +86,10 @@ Or another question: Overall relationship between home square footage and price,
 # a. Relationship between square footage and price
 by_sqft <- ggplot(homes_sub, aes(x = SqFt, y = Price)) +
   geom_point(aes(color = City, pch = Status), alpha = 0.5) +
-  facet_wrap(~Status)
+  facet_wrap(~Status) +
+  theme_classic()
 
-by_sqft
+by_sqft #overall there seems to be a linear relationship. if i have categorical variables it doesn't make sense to show linearity. so don't even explore that. but if you have continous predictor variables check it out. 
 
 # Observations here: Does relationship appear ~ linear? Anything else we can pick out re: trends, outliers, etc.? What is the general trend? Any outliers? Is there reason enough for us to omit it?
 
@@ -109,10 +110,26 @@ Use summary() to view the model output and statistics.
 
 ```{r saturated}
 
-# a. Saturated model: 
+#describe the price of a house as it relates to the variables we have. then we are only going to use sqft as a predictor of home size. 
 
+# a. Saturated model: 
+homes_lm1<- lm(Price ~ City+ Bedrooms+ Bathrooms + SqFt + PricePerSqFt+ Status, data= homes_sub)
+#collinearity = highly correlated predictor variables. 
+#note this is bad because pricepersqft is calculated from the dependent variable price--- biased overfitting of model results
 
 # b. Model summary:
+
+summary(homes_lm1)
+
+
+#how much the outcome variable will change is everything else stays the same. 
+
+#if two houses are exactly the same in the other variables than we would expect a house in san luis to sell for 34,000 more than in arro Grande.
+
+#p-value reflects coefficient to some extent... 
+#p-value is testing the hypothesis that the intercept is zero
+
+#this model sig predicts housing prices. 
 
 ```
 
@@ -121,9 +138,10 @@ The next model: Exclude price per square foot, and bedrooms/bathrooms (since the
 ```{r subset}
 
 # a. Updated model with variables City, SqFt, and Status:
+homes_lm2 <- lm(Price ~ City+ SqFt + Status, data= homes_sub)
 
 # b. Model summary:
-
+summary(homes_lm2)
 ```
 
 Wait...but what if I wanted everything to be with respect to a Regular sale status? Then I need to change my factor levels. We've done this before, here we'll use a different function (fct_relevel) from *forcats* package in the tidyverse. 
@@ -131,21 +149,23 @@ Wait...but what if I wanted everything to be with respect to a Regular sale stat
 ```{r fct_relevel}
 
 # a. Set Status to class 'factor'
-
+#currently lm has made it a character
+homes_sub$Status<- factor(homes_sub$Status)
 
 # b. Check to ensure it's a factor now
 
 
 # c. Check levels:
-
+levels(homes_sub$Status)
 
 # d. Reassign reference level of "Status" to "Regular":
 
+homes_sub$Status <- fct_relevel(homes_sub$Status, "Regular") #separate by comma 
 
 # e. Now run the regression again - same equation, but now the reference level is different (Status = Regular): 
-
-
-
+homes_lm3 <- lm(Price~ City  +SqFt+ Status, data = homes_sub)
+summary(homes_lm3)
+#doesn't change anything about your overall model fit. 
 ```
 
 Interpret the coefficients and statistical outcomes above. 
@@ -161,6 +181,14 @@ Then we can evaluate model diagnostics using the plot() function:
 
 # a. Model diagnostics:
 
+plot(homes_lm3)
+#residual vs. leverage: is vertical scatter changing?  the only reason you would consider removing an outlier is if it is not representative of the population you are trying to study. 188 would be a good house to buy. not that worries
+#is their a change is variance of residuals/residual spread. 
+#red line is a weight average you should ignore. 
+
+#qqplot don't be thrown off by a few endpoint values. pretty normally distributed. only 8/400  are not following .. assumption of normal residuals is totality satified. 
+
+#overall heteroscedasticity is ok and residuals normality def good and conceptually and mathmatically my model is making sense!
 ```
 
 ###6. Model comparison by Akaike Information Criterion
@@ -171,7 +199,14 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 
 # a. AIC values for each model
 
+AIC(homes_lm1)
+AIC(homes_lm2)
+AIC(homes_lm3)
+#obvi lm3 and lm2 will be the same 
+#absolute aic means nothing. only usefuly for comparison. 
 # Answer: which would you pick? 
+#this is a demonstration of why you should never select a final model based on aic. 
+#i wouild still pick homes lm3. 
 
 ```
 
@@ -181,8 +216,10 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 
 # a. Prepare a nice regression table:
 
+stargazer(homes_lm1, homes_lm3, type= "html")
 
 
+#workaround go to the github folder. and open word 
 # Note: If you want to work with this in Word, save to html, open, copy and paste into Word. 
 
 ```
@@ -233,7 +270,14 @@ Make predictions for the new data using predict():
 
 # a. Make predictions using the new data frame:
 
+price_predict <- predict(homes_lm3, newdata= df_new, se.fit = TRUE, interval="confidence") 
+
+#if you arennt getting a datafrmae
+predict_df<- data.frame(df_new, price_predict)
+#make a confidence interval about the mean value
 # b. Bind predictions to the data to make it actually useful:
+#confidence is 95% 
+#dont worry to much about residuals. 
 
 
 
@@ -245,7 +289,11 @@ Then visualize it!
 
 # Create a line graph with square footage on the x-axis, predicted price on y-axis, with color dependent on City and facet_wrapped by sale status (follow along):
 
+predict_graph<- ggplot(predict_df, aes(x=SqFt, y= fit.fit))+
+  geom_line(aes(color= City))+
+  facet_wrap(~Status)
 
+predict_graph
 ```
 
 END LAB
